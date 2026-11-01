@@ -6,16 +6,19 @@
  */
 
 import { cp, mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { constants, zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 
 const { encodeSegment, projectKey, sessionDir, scanZstdFrames, readHeaderFrom, relocateLog, rollbackLog, findStoredLog } =
   await import('./index.js').then((module) => module.internals)
 
-const LIVE_ROOT = join(process.env.DSH_HOME ?? join(process.env.USERPROFILE ?? 'C:\\Users\\森', '.dsh'), 'sessions')
+const LIVE_ROOT = process.env.DSH_HOME === undefined
+  ? join(homedir(), '.dsh', 'sessions')
+  : join(process.env.DSH_HOME, 'sessions')
 const WORK = join(process.cwd(), '.tmp-mover-test')
 const ROOT = join(WORK, 'sessions')
-const TARGET_CWD = 'D:\\DSH\\ray'
+const TARGET_CWD = join(WORK, 'target-workspace')
 
 const checks = []
 function check(name, condition, detail) {
@@ -27,19 +30,13 @@ async function main() {
   await rm(WORK, { recursive: true, force: true })
   await mkdir(ROOT, { recursive: true })
 
-  const sourceProject = '--D-DSH--'
-  const entries = await readdir(join(LIVE_ROOT, sourceProject), { withFileTypes: true })
-  const sessions = []
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const files = await readdir(join(LIVE_ROOT, sourceProject, entry.name), { withFileTypes: true })
-    const log = files.find((file) => file.isFile() && file.name.endsWith('.jsonl.zstd'))
-    if (log === undefined) continue
-    const size = (await stat(join(LIVE_ROOT, sourceProject, entry.name, log.name))).size
-    sessions.push({ id: entry.name, file: log.name, size })
+  const picked = await pickSmallestSession()
+  if (picked === undefined) {
+    console.log(`no session log found under ${LIVE_ROOT}`)
+    process.exitCode = 1
+    return
   }
-  sessions.sort((a, b) => a.size - b.size)
-  const picked = sessions[0]
+  const sourceProject = picked.project
   console.log(`source session: ${picked.id} (${picked.file}, ${picked.size} bytes)\n`)
 
   const staged = join(ROOT, sourceProject, picked.id)
@@ -113,6 +110,29 @@ async function main() {
   console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`)
   await rm(WORK, { recursive: true, force: true })
   if (failed.length > 0) process.exitCode = 1
+}
+
+async function pickSmallestSession() {
+  let best
+  const projects = await readdir(LIVE_ROOT, { withFileTypes: true }).catch(() => [])
+  for (const project of projects) {
+    if (!project.isDirectory()) continue
+    const projectDir = join(LIVE_ROOT, project.name)
+    const sessions = await readdir(projectDir, { withFileTypes: true }).catch(() => [])
+    for (const session of sessions) {
+      if (!session.isDirectory()) continue
+      const sessionDirPath = join(projectDir, session.name)
+      const files = await readdir(sessionDirPath, { withFileTypes: true }).catch(() => [])
+      const log = files.find((file) => file.isFile() && file.name.endsWith('.jsonl.zstd'))
+      if (log === undefined) continue
+      const size = (await stat(join(sessionDirPath, log.name)).catch(() => undefined))?.size
+      if (size === undefined) continue
+      if (best === undefined || size < best.size) {
+        best = { project: project.name, id: session.name, file: log.name, size }
+      }
+    }
+  }
+  return best
 }
 
 function decompressRows(buffer) {
