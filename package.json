@@ -1,0 +1,47 @@
+{
+  "name": "@yg/dsh-session-mover",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Long-press a conversation and drag it into another workspace; the sidebar's own reorder keeps working.",
+  "author": "YG",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zsenpro/DSH-Transpose-Plugin.git"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "LICENSE",
+    "locale/en.json",
+    "locale/zh.json"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    },
+    "manifestVersion": 1
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

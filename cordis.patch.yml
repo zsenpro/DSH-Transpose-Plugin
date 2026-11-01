@@ -1,0 +1,3 @@
+- insert:
+    - id: yg-session-mover
+      name: '@yg/dsh-session-mover'

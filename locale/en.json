@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Relocation",
+    "description": "Long-press a conversation, drop it on another workspace, and its history goes along. Reordering inside a workspace still works."
+  }
+}
